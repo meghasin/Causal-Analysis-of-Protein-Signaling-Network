@@ -1,0 +1,104 @@
+---
+title: "Sachs_data_processing"
+author: "Megha"
+date: "March 4, 2018"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparing the data
+
+Extracting the Sachs et al. raw data available and processing it to a single file and viewing data into a more readable form. 
+
+
+```{r}
+library(gdata)
+library (plyr)
+library(infotheo)
+library(bnlearn)
+library(Rgraphviz)
+data_dir_name <- "data/expData_sampled"
+data_output_dir_name <- "data/expData_discrete"
+files <- list.files(path = "data/expData_raw", pattern = "*.csv")
+
+for (i in seq_along(files)) {
+    filename = files[[i]]
+     t <- read.csv(paste(c(data_dir_name,  "/",  filename), collapse=""), header=TRUE) # load file
+     t[] <- as.data.frame(t)
+     dis_t <- bnlearn::discretize(t, method = "interval", breaks = 3) 
+     for (i in names(dis_t))
+     levels(dis_t[, i]) = c("1", "2", "3")
+     write.csv(dis_t, paste(c(data_output_dir_name,  "/",  filename), collapse=""), row.names=FALSE)
+}
+
+data_dir_name <- "data/expData_discrete"
+data_file_names <- dir(data_dir_name)
+names(data_file_names) <- data_file_names
+
+#set the PATH to perl interpreter
+perl <- "C:/Perl64/bin/perl5.24.3.exe"
+ls=lapply(data_file_names, function(data_file_name) {data.frame(read.csv(paste(c(data_dir_name,  "/",  data_file_name), collapse="")),expt=strsplit(data_file_name,".csv")[[1]])})
+sapply(ls,nrow)
+
+
+df_original <- ldply (ls, data.frame)
+#data_matrix_orig <- do.call(rbind.data.frame,ls)
+#rownames(data_matrix_orig) <- NULL
+#data_matrix <- data_matrix_orig[,1:11]
+rownames(df) <- NULL
+df <- df_original[,2:12]
+write.csv(df, "data/merged_discrete_dataset1.csv", row.names=FALSE)
+head(df)
+```
+
+## Analysing the data
+
+Analysing of the Sachs data.
+
+```{r}
+
+df_matrix <- as.matrix(df)
+hist(df_matrix)
+
+df_transf <- asinh(df_matrix)
+hist(df_transf)
+```
+##Analysis
+So the data appears to be normally distributed.There doesn't seem to be any missing/unknown data.In order to check any correlation among the variables we can further look as follows.
+
+```{r}
+
+plot(df_matrix[, 1], df_matrix[,2]) # correlation between praf , pmek
+
+```
+## Discretization of the data
+
+Discretization of the Sachs data.
+Using Hartemink's algorithm[] , we can deal with sets of homogeneous, continuous variables; this is the reason why they are initially transformed into discrete variables, all with the same number of levels (given by the ibreaks argument). Which of the other algorithms is used is specified by the idisc argument (quantile is the default). The implementation in bnlearn also handles sets of discrete variables with the same number of levels, which are treated as adjacent interval identifiers. This allows the user to perform the initial discretization with the algorithm of his choice, as long as all variables have the same number of levels in the end.
+
+Data are ﬁrst marginalised in 60 intervals, which are subsequently collapsed while reducing the mutual information between the variables as little as possible. The process stops when each variable has 3 levels (i.e. low, average and high expression)
+
+This procedure is good for preserving pairwise dependencies as much as possible, unlike marginal discretisation methods.
+
+
+```{r}
+
+general_perturb1 <- read.xls("data/expData_raw/8. pma.xls", header = TRUE)
+dis_general_perturb1 <- discretize(general_perturb1, method = "hartemink", breaks = 3, ibreaks = 60, idisc = "quantile") 
+for (i in names(dis_general_perturb1))
+  levels(dis_general_perturb1[, i]) = c("LOW", "AVG", "HIGH")
+write.csv(df, "data/merged_dataset.csv", row.names=FALSE)
+head(dis_general_perturb1)
+```
+
+#There each level represents the value belonging to one of Low, Medium, High concentration. For example : praf has three levels (1.61,39.5] , (39.5,74.3], (74.3,552] as Low, Medium, High respectively.
+
+
+
+
